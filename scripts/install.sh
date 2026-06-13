@@ -10,8 +10,7 @@
 # Environment overrides:
 #   WL_LICENSE_KEY    installation key (skips the prompt)
 #   WL_MODE           server | local (skips the prompt)
-#   WL_DIR            install directory (default: /opt/psp-crypto,
-#                     ~/psp-crypto on macOS/Windows)
+#   WL_DIR            install directory (default: ~/psp-crypto)
 #   WL_CHANNEL        release branch (default: stable)
 #   WL_REPO           source repository slug
 #   WL_LICENSE_API    license server URL
@@ -75,10 +74,7 @@ case "$(uname -s)" in
     *) die "Unsupported OS: $(uname -s). Supported: Linux, macOS, Windows (Git Bash), WSL." ;;
 esac
 
-case "$PLATFORM" in
-    linux|wsl) WL_DIR="${WL_DIR:-/opt/psp-crypto}" ;;
-    *)         WL_DIR="${WL_DIR:-$HOME/psp-crypto}" ;;
-esac
+WL_DIR="${WL_DIR:-$HOME/psp-crypto}"
 
 # Root is only required where the script installs packages and writes to /opt.
 if [ "$PLATFORM" = "linux" ] || [ "$PLATFORM" = "wsl" ]; then

@@ -111,9 +111,8 @@ WL_LICENSE_KEY=<your-key> WL_MODE=server \
 ```
 
 Optional environment variables: `WL_DIR` sets the install directory (default
-`/opt/psp-crypto`, or `~/psp-crypto` on macOS/Windows), `WL_CHANNEL` sets the
-release branch (default `stable`), `WL_LICENSE_API` overrides the license
-server URL.
+`~/psp-crypto`), `WL_CHANNEL` sets the release branch (default `stable`),
+`WL_LICENSE_API` overrides the license server URL.
 
 ## Updating
 
@@ -122,15 +121,15 @@ changelog and updates the platform in one click. Manual alternative on the
 server:
 
 ```bash
-cd /opt/psp-crypto && sh scripts/update.sh
+cd ~/psp-crypto && sh scripts/update.sh
 ```
 
 ## Uninstall
 
 ```bash
-cd /opt/psp-crypto
+cd ~/psp-crypto
 docker compose down -v
-cd / && rm -rf /opt/psp-crypto
+cd / && rm -rf ~/psp-crypto
 ```
 
 Note: `down -v` deletes the database volumes. Back up first if you need the
