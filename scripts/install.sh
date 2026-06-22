@@ -328,11 +328,12 @@ fi
 # name, it only has to answer plain HTTP on :80.
 
 exchange_key() { # $1 = optional public_ip; echoes "body\nhttp_code"
-    if [ -n "$1" ]; then
-        _body="{\"license_key\":\"${WL_LICENSE_KEY}\",\"public_ip\":\"$1\"}"
-    else
-        _body="{\"license_key\":\"${WL_LICENSE_KEY}\"}"
-    fi
+    _body="{\"license_key\":\"${WL_LICENSE_KEY}\""
+    [ -n "$1" ] && _body="${_body},\"public_ip\":\"$1\""
+    # Local install has no public IP — ask the license server for an ngrok
+    # tunnel so Crypto Chief webhooks can reach localhost.
+    [ "$WL_MODE" = "local" ] && _body="${_body},\"tunnel\":true"
+    _body="${_body}}"
     curl -sS -m 20 -w $'\n%{http_code}' -X POST "${WL_LICENSE_API}/v1/installer/token" \
         -H 'Content-Type: application/json' -d "$_body" 2>/dev/null
 }
@@ -364,11 +365,21 @@ GIT_TOKEN="$(json_field "$body" token)"
 srv_repo="$(json_field "$body" repo)"
 [ -n "$srv_repo" ] && WL_REPO="$srv_repo"
 BOOTSTRAP_DOMAIN="$(json_field "$body" domain)"
+# Local-install dev tunnel (ngrok), issued by the license server.
+NGROK_DOMAIN="$(json_field "$body" ngrok_domain)"
+NGROK_AUTHTOKEN="$(json_field "$body" ngrok_authtoken)"
 ok "Installation key accepted"
 if [ -n "$BOOTSTRAP_DOMAIN" ]; then
     ok "HTTPS bootstrap domain: https://${BOOTSTRAP_DOMAIN}"
 elif [ -n "$PUBLIC_IP" ]; then
     warn "No bootstrap domain returned; the install wizard will be available on the bare IP."
+fi
+if [ "$WL_MODE" = "local" ]; then
+    if [ -n "$NGROK_DOMAIN" ] && [ -n "$NGROK_AUTHTOKEN" ]; then
+        ok "Public dev tunnel: https://${NGROK_DOMAIN}"
+    else
+        warn "No dev tunnel returned — running in demo mode; external webhooks won't reach localhost."
+    fi
 fi
 
 # --- download ----------------------------------------------------------------
@@ -446,6 +457,17 @@ if [ ! -f "$WL_DIR/.env" ]; then
             echo "# Local install: demo mode (mock provider and dev routes enabled)."
             echo "APP_ENV=development"
             echo
+            if [ -n "$NGROK_DOMAIN" ] && [ -n "$NGROK_AUTHTOKEN" ]; then
+                echo "# Public dev tunnel (ngrok), issued by the license server: gives this"
+                echo "# local install a stable public HTTPS URL so Crypto Chief webhooks"
+                echo "# reach it. COMPOSE_PROFILES=tunnel makes 'docker compose up' start"
+                echo "# the bundled ngrok service (forwards the tunnel into Caddy)."
+                echo "URL=https://${NGROK_DOMAIN}"
+                echo "NGROK_DOMAIN=${NGROK_DOMAIN}"
+                echo "NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}"
+                echo "COMPOSE_PROFILES=tunnel"
+                echo
+            fi
             echo "# Local machine only — never expose the wizard port outside the host."
             echo "WL_WIZARD_BIND=127.0.0.1"
         fi
@@ -549,6 +571,13 @@ else
     printf '      %shttp://localhost:1337/install%s\n' "$C_INFO" "$C_OFF"
     if [ -n "$LAN_IP" ]; then
         printf '      %shttp://%s:1337/install%s   (from other devices on your network)\n' "$C_INFO" "$LAN_IP" "$C_OFF"
+    fi
+    if [ -n "$NGROK_DOMAIN" ]; then
+        printf '\n'
+        printf '  Public HTTPS tunnel (so Crypto Chief webhooks reach this machine):\n'
+        printf '      %shttps://%s%s\n' "$C_INFO" "$NGROK_DOMAIN" "$C_OFF"
+        printf '  Set it as your Crypto Chief API keys in the wizard, then payments\n'
+        printf '  and webhooks work end-to-end against your local stack.\n'
     fi
 fi
 printf '\n'
