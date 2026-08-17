@@ -43,6 +43,9 @@ infrastructure from scratch.
   certificates.
 - **Developer API.** HTTP API for server-to-server integrations plus signed
   webhooks, compatible with the [Crypto Chief SDKs](https://docs-sdk.crypto-chief.com).
+- **Flexible deployment.** Publish on a public IP with automatic TLS — or
+  through a **Cloudflare Tunnel** with zero open inbound ports, on a VPS,
+  behind NAT or on-prem.
 - **One-click updates.** Built-in updater with a version changelog, run
   straight from the admin panel.
 
@@ -69,6 +72,8 @@ and your data stays with you.
   own domains. The backend/wizard port 1337 is bound to localhost only and
   is not exposed. (Without a bootstrap domain the installer publishes 1337
   so you can reach the wizard at `http://<ip>:1337`.)
+  With the **Cloudflare Tunnel** install mode no inbound port is needed at
+  all — only outbound access to Cloudflare on port 7844.
 - An installation key.
 
 ## Getting an installation key
@@ -87,10 +92,9 @@ Run on the server (as root on Linux):
 bash <(curl -sSL https://raw.githubusercontent.com/crypto-chiefs/psp-install/main/scripts/install.sh)
 ```
 
-The installer asks for your installation key and whether this is a public
-server or a local computer. It then installs git, Docker and Docker Compose
-if they are missing, downloads the latest stable version and starts the
-stack.
+The installer asks for your installation key and where you are installing.
+It then installs git, Docker and Docker Compose if they are missing,
+downloads the latest stable version and starts the stack.
 
 - **Public server**: production mode. The installer prints a ready HTTPS
   link like `https://<organization-id>.psp-crypto-chief.com/install`. No
@@ -98,6 +102,8 @@ stack.
   creates the DNS record for your public IP automatically and Cloudflare
   handles TLS in front of your server.
 - **Local computer**: demo mode at `http://localhost:1337/install`.
+- **Cloudflare Tunnel**: production on your own domain with **no inbound
+  port at all** — see below.
 
 Open the link and finish the setup in the web wizard: create the admin
 account, set your branding, connect your Crypto Chief API keys, configure
@@ -113,6 +119,67 @@ WL_LICENSE_KEY=<your-key> WL_MODE=server \
 Optional environment variables: `WL_DIR` sets the install directory (default
 `~/psp-crypto`), `WL_CHANNEL` sets the release branch (default `stable`),
 `WL_LICENSE_API` overrides the license server URL.
+
+### Install behind a Cloudflare Tunnel (Zero Trust)
+
+Choose **3) Cloudflare Tunnel** and the platform is published on your own
+domain without opening a single port. A `cloudflared` connector inside the
+stack dials out to Cloudflare on port 7844 and Cloudflare proxies your
+hostname into it, terminating TLS at the edge — nothing listens on 80, 443
+or 1337, and no certificate is ever issued or renewed on your machine. It
+works the same on a VPS, behind NAT, and on a laptop.
+
+The installer asks for a Cloudflare API token and your domain, then does the
+rest itself:
+
+1. verifies the token against Cloudflare and checks it is active,
+2. installs `jq` (or downloads the official static binary) so the API
+   responses are parsed exactly, not guessed at,
+3. resolves your zone and its account,
+4. creates the tunnel and routes your hostname to the platform,
+5. creates the proxied DNS record,
+6. writes the configuration, starts the stack and verifies that
+   `https://<your-hostname>/health` actually answers.
+
+Create the API token at
+<https://dash.cloudflare.com/profile/api-tokens> → *Create Token* →
+*Custom token*, with:
+
+| Scope | Permission |
+|---|---|
+| Account | Cloudflare Tunnel → Edit |
+| Zone | DNS → Edit |
+| Zone | Zone → Read |
+
+One hostname is enough — it serves the wizard, admin panel, merchant
+cabinet, payment pages, API and incoming webhooks by path. The installer
+can also create per-app subdomains (`admin.`, `merchant.`, `pay.`, `api.`)
+on the same tunnel: pick **Per-app subdomains** in the layout question. The
+platform picks them up on its first boot, so the wizard's Domains step
+comes pre-filled and each cabinet opens on its own address right away.
+
+Re-running the installer is safe on the Cloudflare side: the tunnel name is
+derived from the hostname, so an existing tunnel is reused rather than
+duplicated, and a DNS record that points anywhere other than a tunnel is
+never overwritten without an explicit confirmation.
+
+Non-interactive:
+
+```bash
+WL_LICENSE_KEY=<your-key> WL_MODE=cloudflare \
+CF_API_TOKEN=<cloudflare-token> CF_ZONE=example.com CF_HOSTNAME=psp.example.com \
+  bash <(curl -sSL https://raw.githubusercontent.com/crypto-chiefs/psp-install/main/scripts/install.sh)
+```
+
+Add `CF_LAYOUT=single` to skip the layout question, or pass the subdomains
+directly (any subset): `CF_ADMIN_HOSTNAME=admin.example.com`
+`CF_MERCHANT_HOSTNAME=merchant.example.com` `CF_PAYMENT_HOSTNAME=pay.example.com`
+`CF_API_HOSTNAME=api.example.com`.
+
+If you later add a login gate in Cloudflare Access, scope the policy to the
+`/admin` path (or to the admin hostname when you use subdomains): an Access
+application covering everything would also gate incoming payment webhooks
+and the public payment pages.
 
 ## Updating
 
@@ -134,6 +201,11 @@ cd / && rm -rf ~/psp-crypto
 
 Note: `down -v` deletes the database volumes. Back up first if you need the
 data.
+
+If you installed in the **Cloudflare Tunnel** mode, also clean up the
+resources the installer created in your Cloudflare account: delete the
+tunnel in **Zero Trust → Networks → Tunnels** and the `CNAME` records
+pointing at `<tunnel-id>.cfargotunnel.com` in the zone's DNS.
 
 ## Self-hosted vs hosted crypto payment gateway
 
@@ -165,7 +237,17 @@ No. In production mode the installer prints a ready HTTPS link like
 `https://<organization-id>.psp-crypto-chief.com/install` — the DNS record
 for your public IP is created automatically and TLS is handled by
 Cloudflare, so nothing needs to be issued or configured locally. Connect
-your own domains later in the admin panel.
+your own domains later in the admin panel. If you already have a domain on
+Cloudflare, pick the **Cloudflare Tunnel** install mode instead and launch
+on your own domain right away.
+
+**Can I run a crypto payment gateway without opening any ports?**
+Yes. The **Cloudflare Tunnel** install mode publishes PSP Crypto Platform
+on your own domain with zero inbound ports: a `cloudflared` connector
+inside the stack dials out to Cloudflare (port 7844) and Cloudflare proxies
+your hostname into it, terminating TLS at the edge. The installer creates
+the tunnel, the routes and the DNS records itself from a Cloudflare API
+token — it works on a VPS, behind NAT and even on a home machine.
 
 **Which cryptocurrencies does it support?**
 Bitcoin, Ethereum, BNB Smart Chain, Polygon, Tron, TON, Solana, Litecoin,
@@ -175,8 +257,9 @@ current list.
 
 **Is it really white-label?**
 Yes. You set your own name, logo and colors, and connect custom domains for
-the admin panel, merchant cabinets and payment pages — each with automatic
-Let's Encrypt certificates.
+the admin panel, merchant cabinets and payment pages — with automatic
+Let's Encrypt certificates, or TLS at the Cloudflare edge when installed
+behind a Cloudflare Tunnel.
 
 **Does it have an API and SDKs?**
 Yes. The platform exposes an HTTP API for server-to-server integrations plus
