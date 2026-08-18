@@ -94,7 +94,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/crypto-chiefs/psp-install/mai
 
 The installer asks for your installation key and where you are installing.
 It then installs git, Docker and Docker Compose if they are missing,
-downloads the latest stable version and starts the stack.
+downloads the latest release and starts the stack.
 
 - **Public server**: production mode. The installer prints a ready HTTPS
   link like `https://<organization-id>.psp-crypto-chief.com/install`. No
@@ -117,7 +117,7 @@ WL_LICENSE_KEY=<your-key> WL_MODE=server \
 ```
 
 Optional environment variables: `WL_DIR` sets the install directory (default
-`~/psp-crypto`), `WL_CHANNEL` sets the release branch (default `stable`),
+`~/psp-crypto`), `WL_CHANNEL` sets the release branch (default `main`),
 `WL_LICENSE_API` overrides the license server URL.
 
 ### Install behind a Cloudflare Tunnel (Zero Trust)

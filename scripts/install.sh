@@ -11,7 +11,7 @@
 #   WL_LICENSE_KEY    installation key (skips the prompt)
 #   WL_MODE           server | local | cloudflare (skips the prompt)
 #   WL_DIR            install directory (default: ~/psp-crypto)
-#   WL_CHANNEL        release branch (default: stable)
+#   WL_CHANNEL        release branch (default: main)
 #   WL_REPO           source repository slug
 #   WL_LICENSE_API    license server URL
 #
@@ -33,7 +33,7 @@
 set -euo pipefail
 
 WL_REPO="${WL_REPO:-crypto-chiefs/cryptochief-whitelabel}"
-WL_CHANNEL="${WL_CHANNEL:-stable}"
+WL_CHANNEL="${WL_CHANNEL:-main}"
 WL_LICENSE_KEY="${WL_LICENSE_KEY:-}"
 WL_MODE="${WL_MODE:-}"
 WL_LICENSE_API="${WL_LICENSE_API:-https://license.crypto-chief.com}"
